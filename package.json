@@ -1,0 +1,55 @@
+{
+  "name": "svg-asset-set",
+  "version": "0.1.0",
+  "description": "Renders the ni-c docs assets: one SVG source into light, dark, a self-contained card for npm and an inline copy, plus the social preview. Internal build tooling, not a product.",
+  "keywords": [],
+  "license": "MIT",
+  "author": "Willi Thiel",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ni-c/svg-asset-set.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ni-c/svg-asset-set/issues"
+  },
+  "homepage": "https://github.com/ni-c/svg-asset-set#readme",
+  "type": "module",
+  "bin": {
+    "svg-asset-set": "dist/cli.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "lint": "oxlint --deny-warnings && prettier --check .",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "oxlint": "^1.80.0",
+    "prettier": "^3.6.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  },
+  "private": true
+}
