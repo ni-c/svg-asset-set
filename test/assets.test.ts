@@ -74,6 +74,9 @@ describe('rendering the set', () => {
         'docs/public/architecture-light.svg',
         'docs/public/architecture.svg',
         'docs/public/og.png',
+        // The card's markup, written out so --check has something
+        // deterministic to compare. The PNG cannot be compared byte for byte.
+        'docs/public/og.svg',
       ].sort()
     );
   });
@@ -265,7 +268,9 @@ describe('refusing a source it cannot work with', () => {
 
   it('refuses a home page without the markers', () => {
     const root = project({ home: '# Home\n\nno markers here\n' });
-    expect(() => generate({ root })).toThrow(/missing the ARCHITECTURE:START/);
+    expect(() => generate({ root })).toThrow(
+      /missing the <!-- ARCHITECTURE:START/
+    );
   });
 
   it('works without an aria-labelledby', () => {
@@ -312,6 +317,7 @@ describe('a project laid out differently', () => {
         'out/flow-light.svg',
         'out/flow.svg',
         'out/og.png',
+        'out/og.svg',
       ].sort()
     );
     expect(read(root, 'out/flow.svg')).toContain('Source: art/flow.svg');
@@ -380,5 +386,107 @@ describe('the card copy', () => {
       JSON.stringify({ name: '@scope/thing' })
     );
     expect(() => generate({ root })).not.toThrow();
+  });
+});
+
+describe('what --check can actually see', () => {
+  it('catches an og.json edit that nobody regenerated', () => {
+    // The card was the one artefact --check could not compare: it verified that
+    // og.png existed, was 1280x640 and under a megabyte, and never looked at
+    // the drawing. So a badge edited from "7 tools" to "8 tools" without
+    // running `npm run assets` stayed green forever, and the social preview
+    // kept making the old claim.
+    const root = project();
+    generate({ root });
+    expect(check({ root }).problems).toEqual([]);
+
+    writeFileSync(
+      join(root, 'docs', 'assets', 'og.json'),
+      JSON.stringify({ tagline: ['One line'], badges: ['8 tools', 'MIT'] })
+    );
+    const stale = check({ root });
+    expect(stale.problems.join('\n')).toContain('docs/public/og.svg');
+  });
+
+  it('catches a rename that leaves the card claiming the old name', () => {
+    const root = project();
+    generate({ root });
+    writeFileSync(
+      join(root, 'package.json'),
+      JSON.stringify({ name: 'renamed-mcp' })
+    );
+    expect(check({ root }).problems.join('\n')).toContain('og.svg');
+  });
+
+  it('is deterministic: the card svg is pure string building', () => {
+    // The reason this works where a byte comparison of the PNG would not.
+    const root = project();
+    generate({ root });
+    const first = read(root, 'docs/public/og.svg');
+    generate({ root });
+    expect(read(root, 'docs/public/og.svg')).toBe(first);
+  });
+});
+
+describe('the architecture markers', () => {
+  it('does not eat prose above a page that documents its own markers', () => {
+    // START was the bare word while END was the whole comment, and the
+    // insertion point was "the first --> after the first match". A page
+    // explaining its own markers in an earlier comment therefore had that
+    // sentence matched instead, and everything between it and END — including
+    // the real START — was replaced without a word.
+    const root = project({
+      home: [
+        '# Home',
+        '',
+        '<!-- The diagram between ARCHITECTURE:START and ARCHITECTURE:END is generated. -->',
+        '',
+        '## A whole section of hand-written prose',
+        '',
+        'that nobody wants to lose',
+        '',
+        '<!-- ARCHITECTURE:START -->',
+        'old',
+        '<!-- ARCHITECTURE:END -->',
+        '',
+        'tail',
+        '',
+      ].join('\n'),
+    });
+    generate({ root });
+    const home = read(root, 'docs/index.md');
+    expect(home).toContain('## A whole section of hand-written prose');
+    expect(home).toContain('that nobody wants to lose');
+    expect(home).toContain('tail');
+    expect(home).toContain('<svg');
+  });
+
+  it('refuses markers in the wrong order rather than slicing the page apart', () => {
+    // indexOf('-->', from) was -1 here, so afterStart became 2 and the page was
+    // reduced to its first two characters.
+    const root = project({
+      home: '# Home\n\n<!-- ARCHITECTURE:END -->\n\n<!-- ARCHITECTURE:START -->\n',
+    });
+    expect(() => generate({ root })).toThrow(/before <!-- ARCHITECTURE:START/);
+  });
+
+  it('refuses a page with two start markers', () => {
+    const root = project({
+      home: [
+        '<!-- ARCHITECTURE:START -->',
+        'a',
+        '<!-- ARCHITECTURE:START -->',
+        'b',
+        '<!-- ARCHITECTURE:END -->',
+      ].join('\n'),
+    });
+    expect(() => generate({ root })).toThrow(/more than once/);
+  });
+
+  it('refuses an unterminated start comment', () => {
+    const root = project({
+      home: '<!-- ARCHITECTURE:START\nold\n<!-- ARCHITECTURE:END -->\n',
+    });
+    expect(() => generate({ root })).toThrow(/unterminated/);
   });
 });
