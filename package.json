@@ -1,6 +1,6 @@
 {
   "name": "svg-asset-set",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Renders the ni-c docs assets: one SVG source into light, dark, a self-contained card for npm and an inline copy, plus the social preview. Internal build tooling, not a product.",
   "keywords": [],
   "license": "MIT",

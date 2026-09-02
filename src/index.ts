@@ -59,7 +59,13 @@ const OG_WIDTH = 1280;
 const OG_HEIGHT = 640;
 const OG_MAX_BYTES = 1024 * 1024;
 
-const START = 'ARCHITECTURE:START';
+// Both are the full comment opener, not the bare word. Matching
+// `ARCHITECTURE:START` anywhere meant a page that *documented* its own markers
+// — a sentence naming them in an earlier comment — moved the insertion point
+// above every line of prose in between, and the replacement silently ate all of
+// it. Asymmetric constants are how that went unnoticed: END was already the
+// whole comment.
+const START = '<!-- ARCHITECTURE:START';
 const END = '<!-- ARCHITECTURE:END -->';
 
 /**
@@ -360,6 +366,12 @@ function plan(options: AssetSetOptions): {
     readFileSync(join(paths.root, 'package.json'), 'utf8')
   ) as { name?: string };
 
+  const cardMarkup = cardSvg({
+    ...copy,
+    name: copy.title ?? pkg.name ?? paths.name,
+    site: paths.site,
+  });
+
   const files = new Map<string, string>([
     [
       join(paths.publicDir, `${paths.name}-light.svg`),
@@ -370,34 +382,52 @@ function plan(options: AssetSetOptions): {
       standalone(source, DARK, sourceName),
     ],
     [join(paths.publicDir, `${paths.name}.svg`), carded(source, sourceName)],
+    // The card's own markup, written out so that `--check` has something
+    // deterministic to compare. The PNG cannot be compared byte for byte —
+    // text rasterises differently between machines and fonts — but the SVG it
+    // is rendered from is pure string building, and it is the part that
+    // carries the *statement*: title, tagline, badges, domain. Without this
+    // `--check` only ever confirmed that a 1280x640 file existed, so an edit
+    // to og.json that nobody regenerated stayed green forever.
+    [join(paths.publicDir, 'og.svg'), cardMarkup],
   ]);
 
   if (paths.homePage !== '') {
     // The page keeps its own prose; only the block between the markers is ours.
     const home = readFileSync(paths.homePage, 'utf8');
+    const shown = relative(paths.root, paths.homePage);
     const from = home.indexOf(START);
     const to = home.indexOf(END);
     if (from === -1 || to === -1) {
+      throw new Error(`${shown} is missing the ${START} ... / ${END} markers`);
+    }
+    if (to < from) {
       throw new Error(
-        `${relative(paths.root, paths.homePage)} is missing the ${START} / ${END} markers`
+        `${shown} has ${END} before ${START}. Nothing is rewritten: the ` +
+          'region between them is what this replaces, and inside out it is ' +
+          'the rest of the page.'
       );
     }
-    const afterStart = home.indexOf('-->', from) + 3;
+    if (home.indexOf(START, from + START.length) !== -1) {
+      throw new Error(
+        `${shown} contains ${START} more than once, so which region is ` +
+          'generated is ambiguous. Leave exactly one.'
+      );
+    }
+    // Closed inside the region, not "the next one anywhere after it": with the
+    // marker bare, the first `-->` could belong to a comment further up, and
+    // slicing there discarded everything down to END.
+    const closes = home.indexOf('-->', from);
+    if (closes === -1 || closes > to) {
+      throw new Error(`${shown} has an unterminated ${START} comment.`);
+    }
     files.set(
       paths.homePage,
-      `${home.slice(0, afterStart)}\n${inline(source)}\n${home.slice(to)}`
+      `${home.slice(0, closes + 3)}\n${inline(source)}\n${home.slice(to)}`
     );
   }
 
-  return {
-    paths,
-    files,
-    cardMarkup: cardSvg({
-      ...copy,
-      name: copy.title ?? pkg.name ?? paths.name,
-      site: paths.site,
-    }),
-  };
+  return { paths, files, cardMarkup };
 }
 
 /** Writes every copy and renders the card. */
