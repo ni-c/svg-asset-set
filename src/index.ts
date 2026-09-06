@@ -59,6 +59,18 @@ const OG_WIDTH = 1280;
 const OG_HEIGHT = 640;
 const OG_MAX_BYTES = 1024 * 1024;
 
+/**
+ * The server icon, rendered from the same `favicon.svg` the documentation site
+ * serves. It exists because an MCP server declares `icons` in its handshake and
+ * the specification requires clients to support PNG, while SVG is optional — so
+ * the SVG alone reaches only some of them. 512 is the largest size anyone asks
+ * for and scales down cleanly; the favicon is a 32x32 viewBox, so this is a
+ * vector rescale, not an upscale.
+ */
+const ICON_SIZE = 512;
+const ICON_SOURCE = 'favicon.svg';
+const ICON_FILE = 'icon-512.png';
+
 // Both are the full comment opener, not the bare word. Matching
 // `ARCHITECTURE:START` anywhere meant a page that *documented* its own markers
 // — a sentence naming them in an earlier comment — moved the insertion point
@@ -459,7 +471,75 @@ export function generate(options: AssetSetOptions = {}): AssetSetReport {
   writeFileSync(pngPath, png);
   changed.push(relative(paths.root, pngPath));
 
-  return { changed, problems: [] };
+  const problems: string[] = [];
+  const iconPath = join(paths.publicDir, ICON_FILE);
+  let favicon: string | null = null;
+  try {
+    favicon = readFileSync(join(paths.publicDir, ICON_SOURCE), 'utf8');
+  } catch {
+    // Not fatal, and deliberately not drawn from the architecture source
+    // either: the favicon is the project's mark, and a generated stand-in
+    // would be a different one shipped under the same name.
+    problems.push(
+      `${join(relative(paths.root, paths.publicDir), ICON_SOURCE)} is missing — ` +
+        `${ICON_FILE} not rendered, and the server's icons[] would 404`
+    );
+  }
+  if (favicon !== null) {
+    const icon = new Resvg(favicon, {
+      fitTo: { mode: 'width', value: ICON_SIZE },
+    })
+      .render()
+      .asPng();
+    writeFileSync(iconPath, icon);
+    changed.push(relative(paths.root, iconPath));
+  }
+
+  return { changed, problems };
+}
+
+/**
+ * The header checks both PNGs of this set share.
+ *
+ * Dimensions come out of the IHDR chunk rather than a decoder: the job is to
+ * catch a stale or half-written file, and decoding would add a second way to
+ * fail for reasons that have nothing to do with the drawing. That is also why
+ * the card is never compared byte for byte — text rasterises differently
+ * between machines and fonts.
+ */
+function pngProblems(
+  file: string,
+  shown: string,
+  width: number,
+  height: number,
+  wanted: string,
+  maxBytes?: number
+): string[] {
+  let png: Buffer;
+  try {
+    png = readFileSync(file);
+  } catch {
+    return [`${shown} is missing — run: npm run assets`];
+  }
+  // A zero-length or half-written file would throw a RangeError out of the
+  // header read below instead of reaching a message anyone can act on.
+  if (png.length < 24) {
+    return [
+      `${shown} is ${png.length} bytes — too short to be a PNG. Run: npm run assets`,
+    ];
+  }
+  const problems: string[] = [];
+  const w = png.readUInt32BE(16);
+  const h = png.readUInt32BE(20);
+  if (w !== width || h !== height) {
+    problems.push(`${shown} is ${w}x${h}, ${wanted} wants ${width}x${height}`);
+  }
+  if (maxBytes !== undefined && png.length >= maxBytes) {
+    problems.push(
+      `${shown} is ${(png.length / 1024 / 1024).toFixed(2)} MB, GitHub rejects 1 MB and above`
+    );
+  }
+  return problems;
 }
 
 /**
@@ -487,34 +567,25 @@ export function check(options: AssetSetOptions = {}): AssetSetReport {
     problems.push(`${shown} is out of date — run: npm run assets`);
   }
 
-  const pngPath = join(paths.publicDir, 'og.png');
-  const shownPng = relative(paths.root, pngPath);
-  let png: Buffer | null = null;
-  try {
-    png = readFileSync(pngPath);
-  } catch {
-    problems.push(`${shownPng} is missing — run: npm run assets`);
-    return { changed, problems };
-  }
-  // A zero-length or half-written file would throw a RangeError out of the
-  // header read below instead of reaching a message anyone can act on.
-  if (png.length < 24) {
-    problems.push(
-      `${shownPng} is ${png.length} bytes — too short to be a PNG. Run: npm run assets`
-    );
-    return { changed, problems };
-  }
-  const width = png.readUInt32BE(16);
-  const height = png.readUInt32BE(20);
-  if (width !== OG_WIDTH || height !== OG_HEIGHT) {
-    problems.push(
-      `${shownPng} is ${width}x${height}, GitHub's social preview wants ${OG_WIDTH}x${OG_HEIGHT}`
-    );
-  }
-  if (png.length >= OG_MAX_BYTES) {
-    problems.push(
-      `${shownPng} is ${(png.length / 1024 / 1024).toFixed(2)} MB, GitHub rejects 1 MB and above`
-    );
-  }
+  problems.push(
+    ...pngProblems(
+      join(paths.publicDir, 'og.png'),
+      relative(paths.root, join(paths.publicDir, 'og.png')),
+      OG_WIDTH,
+      OG_HEIGHT,
+      "GitHub's social preview",
+      OG_MAX_BYTES
+    )
+  );
+  problems.push(
+    ...pngProblems(
+      join(paths.publicDir, ICON_FILE),
+      relative(paths.root, join(paths.publicDir, ICON_FILE)),
+      ICON_SIZE,
+      ICON_SIZE,
+      'the icons[] entry a server declares'
+    )
+  );
+
   return { changed, problems };
 }

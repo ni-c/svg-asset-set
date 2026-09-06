@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `icon-512.png`, rendered from the same `docs/public/favicon.svg` the site
+  already serves. An MCP server declares `icons` in its handshake and the
+  specification requires clients to support PNG while SVG is optional, so the
+  SVG alone reaches only some of them. `check()` verifies the file exists and is
+  512x512 — a declared size that does not match the file is a claim no client
+  can test and every client will believe. A missing favicon is reported, not
+  substituted: the mark belongs to the project, and a generated stand-in would
+  be a different one under the same name.
+
 ### Changed
 
 - Source maps are no longer published in the npm tarball. Node reads them only

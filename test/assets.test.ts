@@ -23,7 +23,11 @@ const roots: string[] = [];
 
 /** A project laid out the way the defaults expect. */
 function project(
-  overrides: { source?: string; home?: string | null } = {}
+  overrides: {
+    source?: string;
+    home?: string | null;
+    favicon?: string | null;
+  } = {}
 ): string {
   const root = mkdtempSync(join(tmpdir(), 'svg-asset-set-'));
   roots.push(root);
@@ -45,6 +49,16 @@ function project(
     })
   );
   writeFileSync(join(root, 'docs', 'public', 'CNAME'), 'thing.example.com\n');
+  // The mark of the project, and the source of the server icon. A real one is a
+  // 32x32 viewBox with a single filled shape; this is the smallest thing that
+  // rasterises to the same square.
+  if (overrides.favicon !== null) {
+    writeFileSync(
+      join(root, 'docs', 'public', 'favicon.svg'),
+      overrides.favicon ??
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#4f46e5"/></svg>`
+    );
+  }
   if (overrides.home !== null) {
     writeFileSync(
       join(root, 'docs', 'index.md'),
@@ -73,6 +87,7 @@ describe('rendering the set', () => {
         'docs/public/architecture-dark.svg',
         'docs/public/architecture-light.svg',
         'docs/public/architecture.svg',
+        'docs/public/icon-512.png',
         'docs/public/og.png',
         // The card's markup, written out so --check has something
         // deterministic to compare. The PNG cannot be compared byte for byte.
@@ -164,9 +179,32 @@ describe('rendering the set', () => {
   it('writes nothing the second time', () => {
     const root = project();
     generate({ root });
-    // The card is rendered every run — bytes differ between machines, so it is
-    // never compared — but nothing else should move.
-    expect(generate({ root }).changed).toEqual(['docs/public/og.png']);
+    // Both PNGs are rendered every run — the card's bytes differ between
+    // machines, so neither is compared — but nothing else should move.
+    expect(generate({ root }).changed).toEqual([
+      'docs/public/og.png',
+      'docs/public/icon-512.png',
+    ]);
+  });
+
+  it('renders the server icon at the size the handshake declares', () => {
+    // A server declares `icons` with `sizes: ['512x512']`. If the file behind
+    // that entry is a different size, the declaration is a lie no client can
+    // check and every client will believe.
+    const root = project();
+    generate({ root });
+    const png = readFileSync(join(root, 'docs/public/icon-512.png'));
+    expect(png.readUInt32BE(16)).toBe(512);
+    expect(png.readUInt32BE(20)).toBe(512);
+  });
+
+  it('says so when there is no favicon to render the icon from', () => {
+    // Not fatal, and no stand-in is drawn: the favicon is the project's mark,
+    // and a generated substitute would be a different mark under the same name.
+    const root = project({ favicon: null });
+    const { problems, changed } = generate({ root });
+    expect(problems.join('\n')).toContain('favicon.svg is missing');
+    expect(changed).not.toContain('docs/public/icon-512.png');
   });
 
   it('skips the home page when asked to', () => {
