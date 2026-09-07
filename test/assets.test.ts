@@ -81,7 +81,7 @@ describe('rendering the set', () => {
   it('writes every copy plus the card', () => {
     const root = project();
     const { changed } = generate({ root });
-    expect(changed.sort()).toEqual(
+    expect(changed.toSorted()).toEqual(
       [
         'docs/index.md',
         'docs/public/architecture-dark.svg',
@@ -92,7 +92,7 @@ describe('rendering the set', () => {
         // The card's markup, written out so --check has something
         // deterministic to compare. The PNG cannot be compared byte for byte.
         'docs/public/og.svg',
-      ].sort()
+      ].toSorted()
     );
   });
 
@@ -349,14 +349,14 @@ describe('a project laid out differently', () => {
       // No CNAME to read, so the site name is passed instead.
       site: 'elsewhere.example',
     });
-    expect(changed.sort()).toEqual(
+    expect(changed.toSorted()).toEqual(
       [
         'out/flow-dark.svg',
         'out/flow-light.svg',
         'out/flow.svg',
         'out/og.png',
         'out/og.svg',
-      ].sort()
+      ].toSorted()
     );
     expect(read(root, 'out/flow.svg')).toContain('Source: art/flow.svg');
   });
