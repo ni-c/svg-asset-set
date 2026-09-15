@@ -45,9 +45,9 @@
     "@resvg/resvg-js": "^2.6.2"
   },
   "devDependencies": {
-    "@types/node": "^26.4.1",
+    "@types/node": "^26.5.1",
     "@vitest/coverage-v8": "^5.0.0",
-    "oxlint": "^1.81.0",
+    "oxlint": "^1.82.0",
     "prettier": "^3.6.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
