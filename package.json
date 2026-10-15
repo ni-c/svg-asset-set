@@ -45,10 +45,10 @@
     "@resvg/resvg-js": "^2.6.2"
   },
   "devDependencies": {
-    "@types/node": "^26.6.4",
+    "@types/node": "^26.6.5",
     "@vitest/coverage-v8": "^5.0.3",
-    "oxlint": "^1.86.0",
-    "prettier": "^3.9.9",
+    "oxlint": "^1.87.0",
+    "prettier": "^3.9.10",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
   },
