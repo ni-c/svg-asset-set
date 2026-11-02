@@ -93,7 +93,7 @@ does not wrap text:
     "Inspect, create and adjust",
     "Healthchecks cron and uptime checks"
   ],
-  "badges": ["14 tools", "MIT", "Node ≥22"]
+  "badges": ["14 tools", "MIT"]
 }
 ```
 

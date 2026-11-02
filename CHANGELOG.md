@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Require Node.js 24 or newer. CI tests the latest 24 and 26 LTS releases; Node 22 is no longer supported.
 - oxlint's `suspicious` category is on; 4 findings fixed (mostly
   `Array#toSorted()` over copy-and-sort and un-shadowed names). No runtime
   behaviour changed.
